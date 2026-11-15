@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7-jammy
+    container_name: dilse_mongodb
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: dilse_vibematch
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: dilse_api
+    restart: always
+    ports:
+      - '4000:4000'
+    depends_on:
+      - mongodb
+    environment:
+      PORT: 4000
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017/dilse_vibematch
+      FRONTEND_URL: http://localhost:3000
+      JWT_ACCESS_SECRET: dilse_jwt_access_secret_long_secure_string_2026_dev
+      JWT_REFRESH_SECRET: dilse_jwt_refresh_secret_long_secure_string_2026_dev
+      QR_HMAC_SECRET: dilse_qr_hmac_secret_long_secure_string_2026_dev
+      CLAIM_COOKIE_SECRET: dilse_claim_cookie_secret_long_secure_string_2026_dev
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-placeholder_id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-placeholder_secret}
+      GOOGLE_CALLBACK_URL: http://localhost:4000/api/auth/google/callback
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api
+    container_name: dilse_web
+    restart: always
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+volumes:
+  mongo_data:
