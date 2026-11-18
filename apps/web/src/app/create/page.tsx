@@ -8,12 +8,13 @@ import {
   ArrowLeft,
   ShieldCheck,
   Plus,
-  Trash2,
   Clock,
   Instagram,
-  Phone,
   MessageSquareHeart,
   CheckCircle,
+  HelpCircle,
+  Flame,
+  Check,
 } from 'lucide-react';
 import { useCreatorWizardStore } from '../../store/quiz-store';
 import { EXPIRY_OPTIONS, CONTACT_UNLOCK_RULES } from '../../lib/constants';
@@ -57,10 +58,9 @@ export default function CreateInvitePage() {
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      // If user isn't logged in, login via dev login seamlessly or prompt
+      // If user isn't logged in, login via dev login seamlessly
       let creatorId = currentUser?.id;
       if (!creatorId) {
-        // Fast create fallback
         const devRes = await api.post<any>('/auth/dev-login', {
           name: store.creatorSnapshot.name || 'DilSe Creator',
           email: `creator_${Date.now()}@example.com`,
@@ -112,22 +112,23 @@ export default function CreateInvitePage() {
   // If already generated, render the Poster screen!
   if (store.generatedInvite) {
     return (
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-12 flex flex-col items-center">
+      <div className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 flex flex-col items-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center mb-8"
+          transition={{ duration: 0.5, type: 'spring' }}
+          className="text-center mb-8 space-y-2"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 text-xs sm:text-sm font-bold mb-2 shadow-lg shadow-emerald-500/10">
             <CheckCircle className="w-4 h-4" />
             1-of-1 QR Created Successfully!
           </div>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             Your Secret Vibe QR is Live! 💖
           </h1>
-          <p className="text-white/60 text-sm sm:text-base mt-2 max-w-lg mx-auto">
+          <p className="text-white/70 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
             Share this private QR code with{' '}
-            <span className="text-white font-semibold">
+            <span className="text-white font-bold underline decoration-roseNeon underline-offset-4">
               {store.prefilledFriendName || 'your friend'}
             </span>
             . It locks to their device on the very first scan!
@@ -156,30 +157,34 @@ export default function CreateInvitePage() {
   }
 
   return (
-    <div className="flex-1 max-w-3xl mx-auto px-4 py-10 w-full flex flex-col items-center">
+    <div className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full flex flex-col items-center">
       {/* Wizard Header */}
-      <div className="text-center mb-8">
-        <span className="text-xs font-bold uppercase tracking-widest text-roseNeon">
+      <div className="text-center mb-8 space-y-2 w-full">
+        <span className="inline-block text-xs font-bold uppercase tracking-widest text-roseNeon px-3 py-1 rounded-full bg-roseNeon/10 border border-roseNeon/20">
           Creator Studio
         </span>
-        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight mt-1">
+        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
           Create Secret Vibe Invite
         </h1>
-        <p className="text-white/60 text-sm mt-2">
-          Step {store.step} of 3: {store.step === 1 && 'Profile & Friend Details'}
-          {store.step === 2 && 'True/False Vibe Deck'}
-          {store.step === 3 && 'Security & QR Expiry'}
+        <p className="text-white/60 text-sm sm:text-base max-w-md mx-auto">
+          Step {store.step} of 3:{' '}
+          <strong className="text-white">
+            {store.step === 1 && 'Profile & Friend Details'}
+            {store.step === 2 && 'True/False Vibe Deck'}
+            {store.step === 3 && 'Security & QR Expiry'}
+          </strong>
         </p>
 
         {/* Step Progress Line */}
-        <div className="flex items-center justify-center gap-3 mt-6">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 pt-4">
           {[1, 2, 3].map((s) => (
-            <div
+            <button
               key={s}
+              type="button"
               onClick={() => store.setStep(s)}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                 store.step === s
-                  ? 'bg-roseNeon text-white shadow-lg shadow-roseNeon/30 ring-2 ring-roseNeon/50'
+                  ? 'bg-roseNeon text-white shadow-lg shadow-roseNeon/30 ring-2 ring-roseNeon/50 scale-105'
                   : store.step > s
                   ? 'bg-white/10 text-white/90 border border-white/20'
                   : 'bg-white/5 text-white/40 border border-white/5'
@@ -189,7 +194,7 @@ export default function CreateInvitePage() {
               <span className="hidden sm:inline">
                 {s === 1 ? 'Details' : s === 2 ? 'Questions' : 'Security & QR'}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -199,28 +204,30 @@ export default function CreateInvitePage() {
         {/* STEP 1: Profile & Friend Info */}
         {store.step === 1 && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="rounded-3xl border border-white/15 bg-white/[0.03] p-7 md:p-9 backdrop-blur-2xl space-y-6 shadow-2xl"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="rounded-3xl border border-white/15 bg-white/[0.04] p-6 sm:p-9 backdrop-blur-2xl space-y-6 shadow-2xl relative overflow-hidden"
           >
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
+              <label className="block text-sm font-bold text-white mb-2">
                 Friend Ka Naam / Nickname (Optional)
               </label>
               <Input
                 placeholder="Riya, Kabir, ya khali chhodo..."
                 value={store.prefilledFriendName}
                 onChange={(e) => store.setPrefilledFriendName(e.target.value)}
+                className="h-12 text-sm bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
               />
-              <p className="text-xs text-white/50 mt-1.5">
+              <p className="text-xs text-white/50 mt-2 leading-relaxed">
                 Agar naam daaloge toh scan karte hi &quot;Hey [Naam]!&quot; personal greeting dikhegi. Khali chhodoge toh friend khud apna naam daalega.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">
+                <label className="block text-sm font-bold text-white mb-2">
                   Aapka Display Name
                 </label>
                 <Input
@@ -229,11 +236,12 @@ export default function CreateInvitePage() {
                   onChange={(e) =>
                     store.setCreatorSnapshotField('name', e.target.value)
                   }
+                  className="h-12 text-sm bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">
+                <label className="block text-sm font-bold text-white mb-2">
                   Aapki Tagline
                 </label>
                 <Input
@@ -242,12 +250,13 @@ export default function CreateInvitePage() {
                   onChange={(e) =>
                     store.setCreatorSnapshotField('tagline', e.target.value)
                   }
+                  className="h-12 text-sm bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
+              <label className="block text-sm font-bold text-white mb-2">
                 About Me (Bio)
               </label>
               <Textarea
@@ -257,14 +266,16 @@ export default function CreateInvitePage() {
                 onChange={(e) =>
                   store.setCreatorSnapshotField('bio', e.target.value)
                 }
+                rows={3}
+                className="bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
               />
-              <span className="text-[11px] text-white/40 block text-right mt-1">
+              <span className="text-[11px] text-white/40 block text-right mt-1 font-mono">
                 {store.creatorSnapshot.bio.length} / 280
               </span>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+              <label className="block text-sm font-bold text-white mb-2 flex items-center gap-2">
                 <MessageSquareHeart className="w-4 h-4 text-roseNeon" />
                 Secret Message / Confession 💌 (Locked until match!)
               </label>
@@ -274,19 +285,21 @@ export default function CreateInvitePage() {
                 onChange={(e) =>
                   store.setCreatorSnapshotField('secretMessage', e.target.value)
                 }
+                rows={3}
+                className="bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
               />
             </div>
 
             {/* Social & Unlock Rule */}
-            <div className="pt-4 border-t border-white/10 space-y-4">
+            <div className="pt-6 border-t border-white/10 space-y-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
                 <Instagram className="w-4 h-4 text-pink-400" />
-                Contact Exchange & Mutual Unlock
+                Contact Exchange &amp; Mutual Unlock
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-white/70 block mb-1">
+                  <label className="text-xs text-white/70 block mb-1.5 font-medium">
                     Instagram Handle
                   </label>
                   <Input
@@ -298,10 +311,11 @@ export default function CreateInvitePage() {
                         e.target.value,
                       )
                     }
+                    className="h-11 bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-white/70 block mb-1">
+                  <label className="text-xs text-white/70 block mb-1.5 font-medium">
                     Phone / WhatsApp (Optional)
                   </label>
                   <Input
@@ -310,13 +324,14 @@ export default function CreateInvitePage() {
                     onChange={(e) =>
                       store.setCreatorSnapshotField('phoneNumber', e.target.value)
                     }
+                    className="h-11 bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
                   />
                 </div>
               </div>
 
               {/* Radio cards for Unlock Rule */}
-              <div>
-                <label className="text-xs font-semibold text-white/80 block mb-2">
+              <div className="pt-2">
+                <label className="text-xs font-semibold text-white/80 block mb-2.5">
                   When Should Your Contact Unlock?
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -326,13 +341,13 @@ export default function CreateInvitePage() {
                       onClick={() =>
                         store.setCreatorSnapshotField('unlockRule', rule.value)
                       }
-                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                         store.creatorSnapshot.unlockRule === rule.value
                           ? 'bg-roseNeon/20 border-roseNeon shadow-lg shadow-roseNeon/20 text-white'
                           : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                       }`}
                     >
-                      <div className="text-lg mb-1">{rule.icon}</div>
+                      <div className="text-xl mb-1.5">{rule.icon}</div>
                       <div className="text-xs font-bold text-white">
                         {rule.title}
                       </div>
@@ -351,7 +366,7 @@ export default function CreateInvitePage() {
                 variant="default"
                 size="lg"
                 onClick={() => store.nextStep()}
-                className="gap-2"
+                className="gap-2 px-8 h-12 rounded-2xl shadow-xl shadow-roseNeon/25"
               >
                 Proceed to True/False Deck
                 <ArrowRight className="w-4 h-4" />
@@ -363,9 +378,10 @@ export default function CreateInvitePage() {
         {/* STEP 2: True/False Question Deck */}
         {store.step === 2 && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
             className="space-y-6"
           >
             {/* Active Question Carousel */}
@@ -395,11 +411,11 @@ export default function CreateInvitePage() {
                 <button
                   key={q.questionId}
                   onClick={() => setActiveQuestionIndex(idx)}
-                  className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`w-10 h-10 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                     activeQuestionIndex === idx
-                      ? 'bg-roseNeon text-white ring-2 ring-roseNeon shadow-md'
+                      ? 'bg-roseNeon text-white ring-2 ring-roseNeon shadow-lg shadow-roseNeon/30 scale-105'
                       : q.creatorAnswer !== undefined
-                      ? 'bg-white/15 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                       : 'bg-white/5 text-white/40 border border-white/10'
                   }`}
                 >
@@ -411,7 +427,7 @@ export default function CreateInvitePage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowCustomModal(true)}
-                className="gap-1 text-xs"
+                className="gap-1.5 text-xs h-10 px-4 rounded-2xl"
               >
                 <Plus className="w-3.5 h-3.5 text-roseNeon" />
                 Add Custom
@@ -423,7 +439,7 @@ export default function CreateInvitePage() {
               <Button
                 variant="outline"
                 onClick={() => store.prevStep()}
-                className="gap-2"
+                className="gap-2 h-12 px-6 rounded-2xl"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Details
@@ -433,9 +449,9 @@ export default function CreateInvitePage() {
                 variant="default"
                 size="lg"
                 onClick={() => store.nextStep()}
-                className="gap-2"
+                className="gap-2 h-12 px-8 rounded-2xl shadow-xl shadow-roseNeon/25"
               >
-                Proceed to Security & Expiry
+                Proceed to Security &amp; Expiry
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -445,21 +461,22 @@ export default function CreateInvitePage() {
         {/* STEP 3: Security & QR Generation */}
         {store.step === 3 && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="rounded-3xl border border-white/15 bg-white/[0.03] p-7 md:p-9 backdrop-blur-2xl space-y-8 shadow-2xl"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="rounded-3xl border border-white/15 bg-white/[0.04] p-6 sm:p-9 backdrop-blur-2xl space-y-8 shadow-2xl relative overflow-hidden"
           >
             {/* Single Use Security Badge */}
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400">
-                <ShieldCheck className="w-6 h-6" />
+            <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/10 p-5 sm:p-6 flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400 shadow-md">
+                <ShieldCheck className="w-7 h-7" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">
-                  Cryptographically Enforced Single-Use Lock (maxUses: 1)
+                <h4 className="text-base font-extrabold text-white">
+                  Cryptographically Enforced Single-Use Lock
                 </h4>
-                <p className="text-xs text-white/70 leading-relaxed mt-1">
+                <p className="text-xs sm:text-sm text-white/70 leading-relaxed mt-1">
                   Once your friend scans and submits this invite, the token is permanently burned. No one else can ever access, replay, or submit this quiz.
                 </p>
               </div>
@@ -479,9 +496,9 @@ export default function CreateInvitePage() {
                     key={opt.label}
                     type="button"
                     onClick={() => store.setExpiresInMinutes(opt.minutes)}
-                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                       store.expiresInMinutes === opt.minutes
-                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg shadow-amber-500/20'
+                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg shadow-amber-500/25 scale-[1.02]'
                         : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                     }`}
                   >
@@ -495,33 +512,33 @@ export default function CreateInvitePage() {
             </div>
 
             {/* Summary preview */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-2.5 text-xs sm:text-sm">
               <div className="flex justify-between text-white/70">
                 <span>Friend:</span>
-                <span className="font-semibold text-white">
+                <span className="font-bold text-white">
                   {store.prefilledFriendName || 'Open Name (Friend enters on scan)'}
                 </span>
               </div>
               <div className="flex justify-between text-white/70">
                 <span>Total True/False Questions:</span>
-                <span className="font-semibold text-white">
+                <span className="font-bold text-white">
                   {store.questions.length} Questions
                 </span>
               </div>
               <div className="flex justify-between text-white/70">
                 <span>Contact Unlock:</span>
-                <span className="font-semibold text-white">
+                <span className="font-bold text-white">
                   {store.creatorSnapshot.unlockRule}
                 </span>
               </div>
             </div>
 
             {/* Generate Button */}
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-4 gap-4">
               <Button
                 variant="outline"
                 onClick={() => store.prevStep()}
-                className="gap-2"
+                className="gap-2 h-12 px-6 rounded-2xl"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Questions
@@ -532,7 +549,7 @@ export default function CreateInvitePage() {
                 size="lg"
                 disabled={loading}
                 onClick={handleGenerate}
-                className="gap-2 shadow-xl shadow-roseNeon/30"
+                className="gap-2 h-13 px-8 rounded-2xl shadow-xl shadow-roseNeon/30"
               >
                 <Sparkles className="w-5 h-5 text-white" />
                 {loading ? 'Generating 1-of-1 QR...' : 'Generate My Secret QR Now'}
@@ -548,35 +565,39 @@ export default function CreateInvitePage() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-md rounded-3xl border border-white/20 bg-[#120820] p-6 shadow-2xl"
+            className="w-full max-w-md rounded-3xl border border-white/20 bg-[#120820] p-6 sm:p-7 shadow-2xl space-y-4"
           >
-            <h4 className="text-lg font-bold text-white mb-2">
-              Add Your Own Question
-            </h4>
-            <p className="text-xs text-white/60 mb-4">
-              Type any dating or vibe question. Both of you will answer True or False!
-            </p>
+            <div>
+              <h4 className="text-xl font-extrabold text-white">
+                Add Your Own Question
+              </h4>
+              <p className="text-xs text-white/60 mt-1">
+                Type any dating or vibe question. Both of you will answer True or False!
+              </p>
+            </div>
 
             <form onSubmit={handleAddCustom} className="space-y-4">
               <Textarea
                 placeholder="e.g. Kya tum weekend pe movies dekhna prefer karte ho ya clubbing?"
                 value={customQuestionText}
                 onChange={(e) => setCustomQuestionText(e.target.value)}
+                rows={3}
                 required
+                className="bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
               />
 
               <div>
-                <label className="text-xs text-white/70 block mb-2 font-medium">
-                  Your Answer:
+                <label className="text-xs text-white/75 block mb-2 font-semibold">
+                  Your Secret Answer:
                 </label>
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setCustomQuestionAnswer(true)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    className={`py-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                       customQuestionAnswer === true
-                        ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300'
-                        : 'bg-white/5 border-white/10 text-white/60'
+                        ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-md'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                     }`}
                   >
                     TRUE ✓
@@ -584,10 +605,10 @@ export default function CreateInvitePage() {
                   <button
                     type="button"
                     onClick={() => setCustomQuestionAnswer(false)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    className={`py-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                       customQuestionAnswer === false
-                        ? 'bg-rose-500/25 border-rose-400 text-rose-300'
-                        : 'bg-white/5 border-white/10 text-white/60'
+                        ? 'bg-rose-500/25 border-rose-400 text-rose-300 shadow-md'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                     }`}
                   >
                     FALSE ✕
@@ -595,16 +616,16 @@ export default function CreateInvitePage() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowCustomModal(false)}
-                  className="flex-1"
+                  className="flex-1 h-11 rounded-2xl"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" variant="default" className="flex-1">
+                <Button type="submit" variant="default" className="flex-1 h-11 rounded-2xl">
                   Add Question
                 </Button>
               </div>
