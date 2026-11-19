@@ -3,26 +3,18 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 select-none',
+  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.14em] backdrop-blur-md select-none',
   {
     variants: {
       variant: {
-        default:
-          'border-transparent bg-roseNeon/20 text-roseNeon border border-roseNeon/30',
-        active:
-          'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-sm shadow-emerald-500/20',
-        claimed:
-          'border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-sm shadow-amber-500/20 animate-pulse',
-        completed:
-          'border-rose-500/30 bg-rose-500/10 text-rose-300 shadow-sm shadow-rose-500/20',
-        expired:
-          'border-white/10 bg-white/5 text-white/50',
-        revoked:
-          'border-red-500/30 bg-red-500/10 text-red-400',
-        secondary:
-          'border-transparent bg-white/10 text-white/80',
-        outline:
-          'text-white border-white/20',
+        default: 'bg-roseNeon/15 text-rose-300 border-roseNeon/35',
+        active: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300 shadow-[0_0_18px_-4px_rgba(52,211,153,0.6)]',
+        claimed: 'border-amber-400/40 bg-amber-500/10 text-amber-300 shadow-[0_0_18px_-4px_rgba(251,191,36,0.6)]',
+        completed: 'border-roseNeon/40 bg-roseNeon/10 text-rose-300 shadow-[0_0_18px_-4px_rgba(255,51,102,0.6)]',
+        expired: 'border-white/10 bg-white/5 text-white/45',
+        revoked: 'border-red-500/30 bg-red-500/10 text-red-400',
+        secondary: 'border-transparent bg-white/10 text-white/80',
+        outline: 'text-white border-white/20',
       },
     },
     defaultVariants: {
@@ -31,13 +23,32 @@ const badgeVariants = cva(
   },
 );
 
-export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+const DOT: Record<string, string> = {
+  active: 'bg-emerald-400',
+  claimed: 'bg-amber-400',
+  completed: 'bg-roseNeon',
+  revoked: 'bg-red-400',
+  expired: 'bg-white/40',
+};
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {
+  /** show a live pulsing status dot */
+  dot?: boolean;
+}
+
+function Badge({ className, variant, dot = false, children, ...props }: BadgeProps) {
+  const dotColor = DOT[variant || ''] || 'bg-roseNeon';
+  const live = variant === 'active' || variant === 'claimed';
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div className={cn(badgeVariants({ variant }), className)} {...props}>
+      {dot && (
+        <span className="relative flex w-1.5 h-1.5">
+          {live && <span className={cn('absolute inset-0 rounded-full animate-ping', dotColor)} />}
+          <span className={cn('relative w-1.5 h-1.5 rounded-full', dotColor)} />
+        </span>
+      )}
+      {children}
+    </div>
   );
 }
 

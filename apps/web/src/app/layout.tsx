@@ -1,12 +1,19 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Inter, Unbounded } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '../providers/theme-provider';
 import { QueryProvider } from '../providers/query-provider';
+import { MotionProvider } from '../providers/motion-provider';
 import { Navbar } from '../components/navbar';
 import { FloatingOrbs } from '../components/floating-orbs';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+const display = Unbounded({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['500', '700', '800', '900'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'DilSe VibeMatch — Secret Crush & Friend Compatibility 💖',
@@ -20,21 +27,30 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#0b0714',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${inter.className} bg-velvetNight text-white min-h-screen relative overflow-x-hidden selection:bg-roseNeon/30 selection:text-white`}>
+    <html lang="en" className={`dark ${inter.variable} ${display.variable}`} suppressHydrationWarning>
+      <body className="font-sans bg-velvetNight text-white min-h-screen relative overflow-x-hidden selection:bg-roseNeon/30 selection:text-white">
         <ThemeProvider>
           <QueryProvider>
-            <FloatingOrbs />
-            <Navbar />
-            <div className="relative z-10 flex flex-col min-h-[calc(100vh-4.5rem)]">
-              {children}
-            </div>
+            <MotionProvider>
+              <FloatingOrbs />
+              <Navbar />
+              <div className="relative z-10 flex flex-col min-h-[calc(100vh-5rem)] pb-24 md:pb-0">
+                {children}
+              </div>
+            </MotionProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

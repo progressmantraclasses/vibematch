@@ -13,7 +13,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-12 items-center justify-center rounded-2xl bg-white/5 p-1 text-white/70 backdrop-blur-md border border-white/10',
+      'relative inline-flex h-12 items-center justify-center rounded-2xl bg-white/[0.04] p-1 text-white/70 backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
       className,
     )}
     {...props}
@@ -28,7 +28,8 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-roseNeon disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-roseNeon/20 data-[state=active]:to-electricViolet/20 data-[state=active]:text-white data-[state=active]:border data-[state=active]:border-roseNeon/40 data-[state=active]:shadow-lg cursor-pointer',
+      'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-roseNeon disabled:pointer-events-none disabled:opacity-50 cursor-pointer hover:text-white',
+      'data-[state=active]:text-white data-[state=active]:bg-[linear-gradient(110deg,rgba(255,51,102,0.35),rgba(168,85,247,0.3))] data-[state=active]:shadow-[0_8px_24px_-8px_rgba(255,51,102,0.7),inset_0_0_0_1px_rgba(255,51,102,0.45)]',
       className,
     )}
     {...props}
@@ -43,7 +44,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      'mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      'mt-4 focus-visible:outline-none data-[state=active]:animate-[tab-in_.5s_cubic-bezier(0.16,1,0.3,1)]',
       className,
     )}
     {...props}

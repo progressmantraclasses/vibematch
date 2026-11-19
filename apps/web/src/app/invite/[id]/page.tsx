@@ -2,21 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Heart,
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle,
-  Instagram,
-  Phone,
-  MessageSquareHeart,
-  ShieldCheck,
-  User,
-  Clock,
-} from 'lucide-react';
-import { api, ApiError } from '../../../lib/api';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { Heart, Sparkles, ArrowRight, ArrowLeft, Instagram, Phone, MessageSquareHeart, Mail } from 'lucide-react';
+import { api } from '../../../lib/api';
 import { MOOD_TAGS } from '../../../lib/constants';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -25,6 +13,30 @@ import { Switch } from '../../../components/ui/switch';
 import { QuestionCard } from '../../../components/question-card';
 import { LockedScreen } from '../../../components/locked-screen';
 import { CountdownTimer } from '../../../components/countdown-timer';
+import { HoloCard } from '../../../components/fx/holo-card';
+import { HeartLoader } from '../../../components/fx/heart-loader';
+import { MandalaRing } from '../../../components/fx/mandala-ring';
+import { OrnamentDivider } from '../../../components/fx/ornament-divider';
+import { AvatarOrb } from '../../../components/fx/avatar-orb';
+import { cn } from '../../../lib/utils';
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+const stageVariants: Variants = {
+  enter: { opacity: 0, y: 30, scale: 0.97, filter: 'blur(8px)' },
+  center: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.6, ease: EASE },
+    transitionEnd: { filter: 'none' },
+  },
+  exit: { opacity: 0, y: -20, scale: 0.98, filter: 'blur(6px)', transition: { duration: 0.3 } },
+};
+
+type Stage = 'welcome' | 'questions' | 'confession';
+const STAGES: Stage[] = ['welcome', 'questions', 'confession'];
 
 export default function InviteScannerPage() {
   const params = useParams();
@@ -35,28 +47,23 @@ export default function InviteScannerPage() {
   const rawToken = searchParams.get('t') || '';
 
   const [loading, setLoading] = useState(true);
-  const [errorType, setErrorType] = useState<
-    'ALREADY_USED' | 'EXPIRED' | 'REVOKED' | 'NOT_FOUND' | null
-  >(null);
+  const [errorType, setErrorType] = useState<'ALREADY_USED' | 'EXPIRED' | 'REVOKED' | 'NOT_FOUND' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [inviteData, setInviteData] = useState<any>(null);
 
-  // Friend Flow State
-  const [stage, setStage] = useState<'welcome' | 'questions' | 'confession'>(
-    'welcome',
-  );
+  const [stage, setStage] = useState<Stage>('welcome');
   const [friendName, setFriendName] = useState('');
   const [selectedMood, setSelectedMood] = useState('💫 Dreamy');
   const [aboutMe, setAboutMe] = useState('');
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [currentQIndex, setCurrentQIndex] = useState(0);
 
-  // Secret confession & Mutual contact
   const [secretMessage, setSecretMessage] = useState('');
   const [shareContact, setShareContact] = useState(false);
   const [instagram, setInstagram] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     async function claimInvite() {
@@ -66,16 +73,11 @@ export default function InviteScannerPage() {
         setLoading(false);
         return;
       }
-
       try {
-        const res = await api.post<any>(`/invites/${inviteId}/claim`, {
-          token: rawToken,
-        });
+        const res = await api.post<any>(`/invites/${inviteId}/claim`, { token: rawToken });
         const data = res?.data || res;
         setInviteData(data);
-        if (data?.prefilledFriendName) {
-          setFriendName(data.prefilledFriendName);
-        }
+        if (data?.prefilledFriendName) setFriendName(data.prefilledFriendName);
       } catch (err: any) {
         console.error('Claim error:', err);
         const code = err.code || err.data?.code;
@@ -96,20 +98,22 @@ export default function InviteScannerPage() {
         setLoading(false);
       }
     }
-
     claimInvite();
   }, [inviteId, rawToken]);
 
+  const goStage = (s: Stage) => {
+    setStage(s);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      const answersList = Object.entries(answers).map(
-        ([questionId, responderAnswer]) => ({
-          questionId,
-          responderAnswer,
-        }),
-      );
-
+      const answersList = Object.entries(answers).map(([questionId, responderAnswer]) => ({
+        questionId,
+        responderAnswer,
+      }));
       const payload = {
         responderDisplayName: friendName.trim() || 'Friend',
         responderMoodTag: selectedMood,
@@ -120,34 +124,18 @@ export default function InviteScannerPage() {
         responderPhone: shareContact ? phone.trim() : undefined,
         answers: answersList,
       };
-
       const res = await api.post<any>(`/invites/${inviteId}/submit`, payload);
       const data = res?.data || res;
       router.push(`/match/${data.matchId}`);
     } catch (err: any) {
       console.error('Submission error:', err);
-      alert(err.message || 'Failed to submit quiz.');
+      setSubmitError(err.message || 'Failed to submit quiz.');
       setSubmitting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex-1 min-h-[75vh] flex flex-col items-center justify-center px-4">
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          className="relative mb-6"
-        >
-          <div className="w-20 h-20 rounded-full border-4 border-roseNeon/20 border-t-roseNeon animate-spin" />
-          <Heart className="w-8 h-8 text-roseNeon fill-roseNeon absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_12px_rgba(255,51,102,0.8)]" />
-        </motion.div>
-        <p className="text-white/80 text-base font-semibold tracking-wide animate-pulse">
-          Verifying 1-of-1 Cryptographic QR Code...
-        </p>
-        <span className="text-xs text-white/40 mt-1 font-mono">Single-Use Anti-Replay Guard</span>
-      </div>
-    );
+    return <HeartLoader label="Verifying 1-of-1 Cryptographic QR…" sublabel="Single-Use Anti-Replay Guard" />;
   }
 
   if (errorType) {
@@ -156,287 +144,319 @@ export default function InviteScannerPage() {
 
   const questions = inviteData?.questions || [];
   const creator = inviteData?.creator || {};
+  const stageIndex = STAGES.indexOf(stage);
 
   return (
-    <div className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full flex flex-col items-center">
-      {/* Top Banner with Expiry & Creator pill */}
-      <div className="w-full flex items-center justify-between mb-8 pb-4 border-b border-white/10 gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-2xl bg-roseNeon/20 border border-roseNeon/40 flex items-center justify-center text-base shadow-sm">
-            {creator.avatarEmoji || '😎'}
-          </span>
-          <span className="text-xs sm:text-sm text-white/70">
-            Quiz by <strong className="text-white">{creator.name}</strong>
+    <div className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12 w-full flex flex-col items-center">
+      {/* Top banner — creator ⟷ timer, with stage dots centered */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full grid grid-cols-[1fr_auto_1fr] items-center mb-8 gap-3"
+      >
+        <div className="flex items-center gap-2 min-w-0 justify-self-start">
+          <AvatarOrb emoji={creator.avatarEmoji || '😎'} size="sm" />
+          <span className="text-[11px] sm:text-sm text-white/60 truncate">
+            by <strong className="text-white">{creator.name}</strong>
           </span>
         </div>
+        <div className="flex items-center gap-1.5">
+          {STAGES.map((s, i) => (
+            <motion.span
+              key={s}
+              animate={{ width: i === stageIndex ? 24 : 8 }}
+              className={cn(
+                'h-2 rounded-full transition-colors',
+                i <= stageIndex ? 'bg-gradient-to-r from-roseNeon to-electricViolet' : 'bg-white/15',
+              )}
+            />
+          ))}
+        </div>
+        <div className="justify-self-end">
+          <CountdownTimer expiresAt={inviteData?.expiresAt} className="hidden sm:inline-flex" />
+        </div>
+      </motion.div>
 
+      <div className="sm:hidden -mt-4 mb-6">
         <CountdownTimer expiresAt={inviteData?.expiresAt} />
       </div>
 
-      {/* STAGE 1: PERSONALIZED WELCOME */}
-      {stage === 'welcome' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full rounded-3xl border border-white/15 bg-white/[0.04] p-6 sm:p-10 backdrop-blur-2xl shadow-2xl text-center space-y-6 relative overflow-hidden"
-        >
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-roseNeon to-electricViolet flex items-center justify-center mx-auto shadow-xl shadow-roseNeon/30">
-            <Heart className="w-10 h-10 text-white fill-white animate-pulse" />
-          </div>
+      <AnimatePresence mode="wait">
+        {/* ── STAGE 1: WELCOME ── */}
+        {stage === 'welcome' && (
+          <motion.div key="welcome" variants={stageVariants} initial="enter" animate="center" exit="exit" className="w-full">
+            <HoloCard accent="rose" active className="p-6 sm:p-10 overflow-hidden">
+              <MandalaRing className="absolute left-1/2 -top-24 -translate-x-1/2 w-[440px] opacity-50" />
 
-          <div className="space-y-2">
-            <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-roseNeon/20 border border-roseNeon/40 text-rose-300">
-              Private Vibe Check 💌
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-              {inviteData?.prefilledFriendName ? (
-                <>Hey {inviteData.prefilledFriendName}! ✨</>
-              ) : (
-                <>Welcome to DilSe VibeMatch ✨</>
-              )}
-            </h2>
-            <p className="text-white/70 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-              <strong className="text-white">{creator.name}</strong> created this 1-of-1 private quiz for you with {questions.length} secret True/False questions. Answer honestly to reveal your vibe compatibility %!
-            </p>
-          </div>
+              <div className="relative text-center flex flex-col items-center">
+                {/* envelope → heart reveal */}
+                <motion.div
+                  initial={{ scale: 0, rotate: -15 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 180, damping: 12, delay: 0.15 }}
+                  className="relative mb-6"
+                >
+                  <span className="absolute inset-0 rounded-3xl bg-roseNeon/40 animate-ping-soft" />
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-tr from-roseNeon via-fuchsia-500 to-electricViolet grid place-items-center shadow-[0_20px_50px_-10px_rgba(255,51,102,0.9)] ring-1 ring-white/25">
+                    <Heart className="w-10 h-10 sm:w-12 sm:h-12 text-white fill-white heartbeat-glow" />
+                  </div>
+                </motion.div>
 
-          {/* Name Confirmation/Input */}
-          <div className="text-left space-y-5 pt-3 border-t border-white/10">
-            <div>
-              <label className="text-xs sm:text-sm font-bold text-white/90 block mb-1.5">
-                Apna Naam Confirm Karein
-              </label>
-              <Input
-                placeholder="Aapka naam"
-                value={friendName}
-                onChange={(e) => setFriendName(e.target.value)}
-                className="h-12 bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs sm:text-sm font-bold text-white/90 block mb-2">
-                Aapka Current Vibe / Mood
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {MOOD_TAGS.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => setSelectedMood(tag.label)}
-                    className={`px-3.5 py-2 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
-                      selectedMood === tag.label
-                        ? 'bg-roseNeon/25 border-roseNeon text-white shadow-md shadow-roseNeon/20 scale-105'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    {tag.label}
-                  </button>
-                ))}
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-bold bg-roseNeon/15 border border-roseNeon/35 text-rose-200 mb-4">
+                  <Mail className="w-3.5 h-3.5" /> Private Vibe Check
+                </span>
+                <h2 className="font-display text-[1.75rem] leading-tight sm:text-4xl font-black text-white tracking-tight">
+                  {inviteData?.prefilledFriendName ? (
+                    <>
+                      Hey <span className="text-shimmer">{inviteData.prefilledFriendName}</span>! ✨
+                    </>
+                  ) : (
+                    <>
+                      Welcome to <span className="text-shimmer">DilSe</span> ✨
+                    </>
+                  )}
+                </h2>
+                <OrnamentDivider className="my-4" />
+                <p className="text-white/65 text-sm sm:text-base max-w-md leading-relaxed">
+                  <strong className="text-white">{creator.name}</strong> ne tumhare liye {questions.length} secret True/False sawaal banaye hain. Imaandari se answer karo aur apna vibe % reveal karo!
+                </p>
               </div>
-            </div>
 
-            <div>
-              <label className="text-xs sm:text-sm font-bold text-white/90 block mb-1.5">
-                About Me / Bio (Optional)
-              </label>
-              <Textarea
-                placeholder="Ek chhoti si line apne baare mein..."
-                value={aboutMe}
-                onChange={(e) => setAboutMe(e.target.value)}
-                rows={2}
-                className="bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl text-sm"
-              />
-            </div>
-          </div>
+              <div className="relative text-left space-y-5 mt-8 pt-6 border-t border-white/10">
+                <div>
+                  <label className="text-xs sm:text-sm font-bold text-white/90 block mb-2">Apna Naam Confirm Karein</label>
+                  <Input placeholder="Aapka naam" value={friendName} onChange={(e) => setFriendName(e.target.value)} />
+                </div>
 
-          <Button
-            variant="default"
-            size="lg"
-            onClick={() => setStage('questions')}
-            className="w-full gap-2 h-13 rounded-2xl shadow-xl shadow-roseNeon/30 text-base font-bold"
-          >
-            Start Answering Quiz
-            <ArrowRight className="w-5 h-5" />
-          </Button>
-        </motion.div>
-      )}
+                <div>
+                  <label className="text-xs sm:text-sm font-bold text-white/90 block mb-2.5">Aapka Current Vibe / Mood</label>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {MOOD_TAGS.map((tag) => {
+                      const sel = selectedMood === tag.label;
+                      return (
+                        <motion.button
+                          key={tag.id}
+                          type="button"
+                          whileTap={{ scale: 0.9 }}
+                          whileHover={{ y: -2 }}
+                          onClick={() => setSelectedMood(tag.label)}
+                          className={cn(
+                            'relative px-4 h-10 rounded-2xl text-xs font-bold border transition-colors cursor-pointer',
+                            sel ? 'border-roseNeon text-white' : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:border-white/25',
+                          )}
+                        >
+                          {sel && (
+                            // no layoutId: it would block the stage's AnimatePresence exit
+                            <motion.span
+                              initial={{ opacity: 0, scale: 0.7 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="absolute inset-0 rounded-2xl bg-[linear-gradient(110deg,rgba(255,51,102,0.35),rgba(168,85,247,0.3))] shadow-[0_8px_20px_-6px_rgba(255,51,102,0.8)]"
+                              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                            />
+                          )}
+                          <span className="relative">{tag.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-      {/* STAGE 2: TRUE / FALSE DECK */}
-      {stage === 'questions' && questions.length > 0 && (
-        <div className="w-full space-y-6">
-          <QuestionCard
-            questionId={questions[currentQIndex]?.questionId}
-            questionNumber={currentQIndex + 1}
-            totalQuestions={questions.length}
-            text={questions[currentQIndex]?.text}
-            selectedAnswer={answers[questions[currentQIndex]?.questionId]}
-            onAnswer={(ans) => {
-              setAnswers((prev) => ({
-                ...prev,
-                [questions[currentQIndex].questionId]: ans,
-              }));
+                <div>
+                  <label className="text-xs sm:text-sm font-bold text-white/90 block mb-2">About Me / Bio (Optional)</label>
+                  <Textarea
+                    placeholder="Ek chhoti si line apne baare mein…"
+                    value={aboutMe}
+                    onChange={(e) => setAboutMe(e.target.value)}
+                    rows={2}
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </div>
 
-              if (currentQIndex < questions.length - 1) {
-                setTimeout(() => {
-                  setCurrentQIndex((prev) => prev + 1);
-                }, 220);
-              } else {
-                setTimeout(() => {
-                  setStage('confession');
-                }, 320);
-              }
-            }}
-          />
-
-          <div className="flex items-center justify-between gap-4 px-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentQIndex === 0}
-              onClick={() => setCurrentQIndex((prev) => Math.max(0, prev - 1))}
-              className="gap-1.5 h-10 px-4 rounded-xl"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Previous
-            </Button>
-
-            <span className="text-xs sm:text-sm text-white/60 font-semibold font-mono">
-              {Object.keys(answers).length} / {questions.length} Answered
-            </span>
-
-            {currentQIndex < questions.length - 1 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCurrentQIndex((prev) => prev + 1)}
-                className="gap-1.5 h-10 px-4 rounded-xl text-white/60 hover:text-white"
-              >
-                Skip
-                <ArrowRight className="w-4 h-4" />
+              <Button size="xl" onClick={() => goStage('questions')} className="relative w-full gap-2 mt-8">
+                Start Answering
+                <ArrowRight className="w-5 h-5" />
               </Button>
-            ) : (
-              <Button
-                variant="rose"
-                size="sm"
-                onClick={() => setStage('confession')}
-                className="gap-1.5 h-10 px-5 rounded-xl font-bold"
-              >
-                Next
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+            </HoloCard>
+          </motion.div>
+        )}
 
-      {/* STAGE 3: SECRET CONFESSION & CONTACT EXCHANGE */}
-      {stage === 'confession' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full rounded-3xl border border-white/15 bg-white/[0.04] p-6 sm:p-9 backdrop-blur-2xl shadow-2xl space-y-6 relative overflow-hidden"
-        >
-          <div>
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-roseNeon px-3 py-1 rounded-full bg-roseNeon/10 border border-roseNeon/20">
-              Final Step
-            </span>
-            <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2">
-              Secret Message &amp; Mutual Vibe 💖
-            </h3>
-            <p className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed">
-              Both of your confessions and contact info stay locked until the match results are revealed!
-            </p>
-          </div>
-
-          {/* Secret Message */}
-          <div>
-            <label className="text-xs sm:text-sm font-bold text-white/90 block mb-2 flex items-center gap-2">
-              <MessageSquareHeart className="w-4 h-4 text-roseNeon" />
-              {creator.name} ke liye koi Secret Note / Confession? 💭
-            </label>
-            <Textarea
-              placeholder="Kuch aisa jo tum unhe batana chahte ho..."
-              value={secretMessage}
-              onChange={(e) => setSecretMessage(e.target.value)}
-              rows={3}
-              className="bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl text-sm"
+        {/* ── STAGE 2: QUESTION DECK ── */}
+        {stage === 'questions' && questions.length > 0 && (
+          <motion.div key="questions" variants={stageVariants} initial="enter" animate="center" exit="exit" className="w-full space-y-6">
+            <QuestionCard
+              questionId={questions[currentQIndex]?.questionId}
+              questionNumber={currentQIndex + 1}
+              totalQuestions={questions.length}
+              text={questions[currentQIndex]?.text}
+              selectedAnswer={answers[questions[currentQIndex]?.questionId]}
+              onAnswer={(ans) => {
+                setAnswers((prev) => ({ ...prev, [questions[currentQIndex].questionId]: ans }));
+                if (currentQIndex < questions.length - 1) {
+                  setTimeout(() => setCurrentQIndex((prev) => prev + 1), 220);
+                } else {
+                  setTimeout(() => goStage('confession'), 420);
+                }
+              }}
             />
-          </div>
 
-          {/* Mutual Contact Toggle */}
-          <div className="p-5 sm:p-6 rounded-2xl border border-roseNeon/30 bg-roseNeon/10 space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col">
-                <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-roseNeon" />
-                  Mujhe tumhari vibe pasand aayi! 💖
-                </span>
-                <span className="text-xs text-white/65 mt-0.5 leading-relaxed">
-                  Share my Instagram / WhatsApp number with {creator.name}
-                </span>
-              </div>
-              <Switch checked={shareContact} onCheckedChange={setShareContact} />
-            </div>
-
-            {shareContact && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10"
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentQIndex === 0}
+                onClick={() => setCurrentQIndex((prev) => Math.max(0, prev - 1))}
+                className="justify-self-start gap-1.5 h-11 px-4 rounded-xl"
               >
+                <ArrowLeft className="w-4 h-4" />
+                Prev
+              </Button>
+              <span className="font-mono text-xs text-white/55 font-bold px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+                {Object.keys(answers).length}/{questions.length}
+              </span>
+              {currentQIndex < questions.length - 1 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentQIndex((prev) => prev + 1)}
+                  className="justify-self-end gap-1.5 h-11 px-4 rounded-xl"
+                >
+                  Skip
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button variant="rose" size="sm" onClick={() => goStage('confession')} className="justify-self-end gap-1.5 h-11 px-4 rounded-xl">
+                  Next
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── STAGE 3: CONFESSION ── */}
+        {stage === 'confession' && (
+          <motion.div key="confession" variants={stageVariants} initial="enter" animate="center" exit="exit" className="w-full space-y-5">
+            <HoloCard accent="violet" active className="p-6 sm:p-9 overflow-hidden">
+              <div className="text-center flex flex-col items-center mb-7">
+                {/* animated envelope */}
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.15, type: 'spring', stiffness: 160, damping: 14 }}
+                  className="relative w-20 h-14 mb-5"
+                >
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-roseNeon/40 to-electricViolet/40 border border-white/25 shadow-[0_15px_40px_-10px_rgba(168,85,247,0.8)]" />
+                  <motion.div
+                    className="absolute inset-x-0 top-0 h-8 origin-top"
+                    style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)', background: 'linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0.1))' }}
+                    initial={{ rotateX: 0 }}
+                    animate={{ rotateX: 180 }}
+                    transition={{ delay: 0.6, duration: 0.6, ease: EASE }}
+                  />
+                  <motion.div
+                    initial={{ y: 0, opacity: 0 }}
+                    animate={{ y: -22, opacity: 1 }}
+                    transition={{ delay: 1, type: 'spring', stiffness: 200, damping: 12 }}
+                    className="absolute left-1/2 top-2 -translate-x-1/2"
+                  >
+                    <Heart className="w-7 h-7 text-roseNeon fill-roseNeon drop-shadow-[0_0_12px_rgba(255,51,102,0.9)]" />
+                  </motion.div>
+                </motion.div>
+
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-300 px-3.5 py-1 rounded-full bg-electricViolet/10 border border-electricViolet/30">
+                  Final Step
+                </span>
+                <h3 className="font-display text-2xl sm:text-3xl font-black text-white tracking-tight mt-3">
+                  Secret Message &amp; <span className="text-shimmer">Mutual Vibe</span>
+                </h3>
+                <p className="text-white/55 text-xs sm:text-sm mt-2 leading-relaxed max-w-sm">
+                  Dono ke confessions aur contacts match reveal hone tak locked rahenge!
+                </p>
+              </div>
+
+              <div className="space-y-5">
                 <div>
-                  <label className="text-xs text-white/70 block mb-1.5 font-medium">
-                    Instagram Handle
+                  <label className="text-xs sm:text-sm font-bold text-white/90 mb-2 flex items-center gap-2">
+                    <MessageSquareHeart className="w-4 h-4 text-roseNeon" />
+                    {creator.name} ke liye koi Secret Note? 💭
                   </label>
-                  <Input
-                    placeholder="@yourhandle"
-                    value={instagram}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    className="h-11 bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
+                  <Textarea
+                    placeholder="Kuch aisa jo tum unhe batana chahte ho…"
+                    value={secretMessage}
+                    onChange={(e) => setSecretMessage(e.target.value)}
+                    rows={3}
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-white/70 block mb-1.5 font-medium">
-                    Phone / WhatsApp
-                  </label>
-                  <Input
-                    placeholder="+91 9876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="h-11 bg-white/5 border-white/15 focus-visible:ring-roseNeon rounded-2xl"
-                  />
+
+                <div
+                  className={cn(
+                    'p-5 sm:p-6 rounded-2xl border transition-all duration-500',
+                    shareContact
+                      ? 'border-roseNeon/50 bg-gradient-to-br from-roseNeon/15 to-electricViolet/10 shadow-[0_15px_40px_-15px_rgba(255,51,102,0.7)]'
+                      : 'border-white/10 bg-white/[0.03]',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-roseNeon" />
+                        Mujhe tumhari vibe pasand aayi! 💖
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-white/55 mt-1 leading-relaxed">
+                        Share my Instagram / WhatsApp with {creator.name}
+                      </span>
+                    </div>
+                    <Switch checked={shareContact} onCheckedChange={setShareContact} />
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {shareContact && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.35, ease: EASE }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 mt-4 border-t border-white/10">
+                          <div>
+                            <label className="text-xs text-white/70 mb-1.5 font-medium flex items-center gap-1.5">
+                              <Instagram className="w-3.5 h-3.5 text-pink-400" /> Instagram
+                            </label>
+                            <Input placeholder="@yourhandle" value={instagram} onChange={(e) => setInstagram(e.target.value)} className="h-11" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-white/70 mb-1.5 font-medium flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp
+                            </label>
+                            <Input placeholder="+91 9876543210" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </motion.div>
+              </div>
+            </HoloCard>
+
+            {submitError && (
+              <div className="px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-sm text-red-300 text-center">{submitError}</div>
             )}
-          </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-4 gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setStage('questions')}
-              className="gap-1.5 h-12 px-6 rounded-2xl"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Questions
-            </Button>
-
-            <Button
-              variant="default"
-              size="lg"
-              disabled={submitting}
-              onClick={handleSubmit}
-              className="gap-2 h-13 px-8 rounded-2xl shadow-xl shadow-roseNeon/30 text-base font-bold"
-            >
-              <Heart className="w-5 h-5 fill-white" />
-              {submitting ? 'Calculating Vibe Match...' : 'Reveal Vibe Compatibility'}
-            </Button>
-          </div>
-        </motion.div>
-      )}
+            <div className="grid grid-cols-[auto_1fr] gap-3">
+              <Button variant="outline" onClick={() => goStage('questions')} className="gap-2 h-14 sm:h-16 px-5 rounded-2xl" aria-label="Back to questions">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <Button size="xl" disabled={submitting} onClick={handleSubmit} className="gap-2 w-full">
+                <Heart className={cn('w-5 h-5 fill-white', submitting && 'animate-pulse')} />
+                {submitting ? 'Calculating Vibe…' : 'Reveal Compatibility'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

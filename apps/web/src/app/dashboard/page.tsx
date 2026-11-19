@@ -2,28 +2,121 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   PlusCircle,
   QrCode,
   Heart,
-  Clock,
-  ShieldAlert,
   ArrowRight,
-  ExternalLink,
   Sparkles,
-  Edit3,
-  CheckCircle2,
   Trash2,
+  Activity,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { CountdownTimer } from '../../components/countdown-timer';
 import { AnimatedCounter } from '../../components/animated-counter';
 import { GoogleAuthButton } from '../../components/google-auth-button';
+import { HoloCard } from '../../components/fx/holo-card';
+import { HeartLoader } from '../../components/fx/heart-loader';
+import { Medallion } from '../../components/fx/medallion';
+import { AvatarOrb } from '../../components/fx/avatar-orb';
+import { MandalaRing } from '../../components/fx/mandala-ring';
+import { Stagger, StaggerItem } from '../../components/fx/reveal';
+import { ACCENT_SOLID, type Accent } from '../../components/fx/accent';
+import { cn } from '../../lib/utils';
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+const STATUS_VARIANT: Record<string, 'active' | 'claimed' | 'completed' | 'expired' | 'revoked'> = {
+  ACTIVE: 'active',
+  CLAIMED: 'claimed',
+  COMPLETED: 'completed',
+  EXPIRED: 'expired',
+  REVOKED: 'revoked',
+};
+
+const STATUS_ACCENT: Record<string, Accent> = {
+  ACTIVE: 'emerald',
+  CLAIMED: 'amber',
+  COMPLETED: 'rose',
+  EXPIRED: 'violet',
+  REVOKED: 'rose',
+};
+
+function MiniRing({ value }: { value: number }) {
+  const r = 22;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative w-16 h-16 shrink-0">
+      <svg viewBox="0 0 56 56" className="w-full h-full -rotate-90">
+        <circle cx="28" cy="28" r={r} stroke="rgba(255,255,255,0.08)" strokeWidth="5" fill="none" />
+        <motion.circle
+          cx="28"
+          cy="28"
+          r={r}
+          stroke="url(#mini-ring)"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={c}
+          initial={{ strokeDashoffset: c }}
+          whileInView={{ strokeDashoffset: c - (Math.min(100, value) / 100) * c }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.4, ease: EASE }}
+        />
+        <defs>
+          <linearGradient id="mini-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#ff3366" />
+            <stop offset="1" stopColor="#a855f7" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 grid place-items-center font-display text-sm font-black text-white">{value}%</div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  body,
+  cta,
+}: {
+  icon: React.ElementType;
+  title: string;
+  body: string;
+  cta: string;
+}) {
+  return (
+    <HoloCard accent="violet" className="relative overflow-hidden py-14 sm:py-20 px-6 text-center">
+      <MandalaRing className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] opacity-40" />
+      <div className="relative flex flex-col items-center gap-3">
+        <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}>
+          <Medallion accent="violet" className="w-16 h-16 sm:w-16 sm:h-16 rounded-3xl mb-2">
+            <Icon className="w-7 h-7" />
+          </Medallion>
+        </motion.div>
+        <h3 className="font-display text-lg sm:text-xl font-bold text-white">{title}</h3>
+        <p className="text-xs sm:text-sm text-white/50 max-w-sm">{body}</p>
+        <Link href="/create" className="pt-3">
+          <Button size="lg" className="rounded-2xl gap-2">
+            <Sparkles className="w-4 h-4" />
+            {cta}
+          </Button>
+        </Link>
+      </div>
+    </HoloCard>
+  );
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -31,6 +124,8 @@ export default function DashboardPage() {
   const [invites, setInvites] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -38,18 +133,14 @@ export default function DashboardPage() {
         const meRes = await api.get<{ user: any; stats: any }>('/auth/me');
         if (meRes?.user) {
           setUser(meRes.user);
-
-          // Load invites and connections
           const [invitesRes, matchesRes] = await Promise.all([
             api.get<any[]>('/invites/my').catch(() => []),
             api.get<any[]>('/matches/my-connections').catch(() => []),
           ]);
-
           setInvites(Array.isArray(invitesRes) ? invitesRes : (invitesRes as any)?.data || []);
           setMatches(Array.isArray(matchesRes) ? matchesRes : (matchesRes as any)?.data || []);
         }
-      } catch (err) {
-        // Not authenticated
+      } catch {
         setUser(null);
       } finally {
         setLoading(false);
@@ -58,60 +149,48 @@ export default function DashboardPage() {
     loadDashboard();
   }, []);
 
-  const handleRevoke = async (inviteId: string) => {
-    if (!confirm('Are you sure you want to revoke this QR invite? Nobody will be able to scan it.')) {
-      return;
-    }
+  const confirmRevoke = async () => {
+    if (!pendingRevoke) return;
+    const inviteId = pendingRevoke.id;
     setRevokingId(inviteId);
+    setPendingRevoke(null);
     try {
       await api.patch(`/invites/${inviteId}/revoke`);
-      setInvites((prev) =>
-        prev.map((inv) =>
-          inv.id === inviteId ? { ...inv, status: 'REVOKED' } : inv,
-        ),
-      );
+      setInvites((prev) => prev.map((inv) => (inv.id === inviteId ? { ...inv, status: 'REVOKED' } : inv)));
     } catch (err: any) {
-      alert(err.message || 'Failed to revoke invite');
+      setError(err.message || 'Failed to revoke invite');
     } finally {
       setRevokingId(null);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex-1 min-h-[75vh] flex flex-col items-center justify-center px-4">
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          className="relative mb-6"
-        >
-          <div className="w-16 h-16 rounded-full border-4 border-roseNeon/20 border-t-roseNeon animate-spin" />
-          <Heart className="w-6 h-6 text-roseNeon fill-roseNeon absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_12px_rgba(255,51,102,0.8)]" />
-        </motion.div>
-        <p className="text-white/80 text-base font-semibold tracking-wide animate-pulse">
-          Loading your vibe records...
-        </p>
-      </div>
-    );
+    return <HeartLoader label="Loading your vibe records…" sublabel="Syncing dashboard" />;
   }
 
   if (!user) {
     return (
-      <div className="flex-1 min-h-[75vh] flex flex-col items-center justify-center text-center px-4 py-12">
-        <div className="max-w-md w-full rounded-3xl border border-white/15 bg-white/[0.04] p-8 sm:p-10 backdrop-blur-2xl shadow-2xl space-y-4">
-          <div className="w-18 h-18 rounded-3xl bg-roseNeon/20 border border-roseNeon/30 flex items-center justify-center mx-auto text-roseNeon shadow-lg shadow-roseNeon/20">
-            <LayoutDashboard className="w-9 h-9" />
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white">
-            Sign In to View Dashboard
-          </h2>
-          <p className="text-xs sm:text-sm text-white/60 leading-relaxed mb-4">
-            Log in with Google to view all your created QR invites, active match connections, live chats, and secret confessions.
-          </p>
-          <div className="pt-2">
+      <div className="flex-1 min-h-[75vh] flex items-center justify-center px-4 py-12 relative">
+        <MandalaRing className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-w-[130vw] opacity-60" />
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="relative max-w-md w-full"
+        >
+          <HoloCard accent="rose" active tilt className="p-8 sm:p-10 text-center">
+            <div className="flex justify-center mb-5">
+              <Medallion accent="rose" className="w-18 h-18 sm:w-18 sm:h-18 rounded-3xl">
+                <LayoutDashboard className="w-8 h-8" />
+              </Medallion>
+            </div>
+            <h2 className="font-display text-2xl sm:text-3xl font-black text-white mb-3">Sign In to View Dashboard</h2>
+            <p className="text-xs sm:text-sm text-white/60 leading-relaxed mb-7">
+              Log in with Google to view all your created QR invites, active match connections, live chats, and secret confessions.
+            </p>
             <GoogleAuthButton />
-          </div>
-        </div>
+          </HoloCard>
+        </motion.div>
       </div>
     );
   }
@@ -119,263 +198,250 @@ export default function DashboardPage() {
   const activeInvites = invites.filter((i) => i.status === 'ACTIVE' || i.status === 'CLAIMED');
   const completedMatches = invites.filter((i) => i.status === 'COMPLETED').length + matches.length;
 
+  const stats: { label: string; value: number; accent: Accent; icon: React.ElementType }[] = [
+    { label: 'Total Invites', value: invites.length, accent: 'violet', icon: QrCode },
+    { label: 'Active / Claimed', value: activeInvites.length, accent: 'emerald', icon: Activity },
+    { label: 'Completed', value: completedMatches, accent: 'rose', icon: CheckCircle2 },
+    { label: 'Connections', value: matches.length, accent: 'amber', icon: Users },
+  ];
+
   return (
-    <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full space-y-10">
-      {/* Profile Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-white/10"
-      >
-        <div className="flex items-center gap-4">
-          {user.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="w-16 h-16 sm:w-18 sm:h-18 rounded-3xl object-cover border-2 border-roseNeon shadow-xl shadow-roseNeon/20"
-            />
-          ) : (
-            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-3xl bg-roseNeon/20 border border-roseNeon/40 flex items-center justify-center text-3xl shadow-xl shadow-roseNeon/20">
-              {user.customAvatarEmoji || '😎'}
-            </div>
-          )}
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              {user.name}
-            </h1>
-            <p className="text-xs sm:text-sm text-rose-300 font-semibold mt-0.5">
-              {user.tagline || 'Ready to match vibes ✨'}
-            </p>
-          </div>
-        </div>
-
-        <Link href="/create">
-          <Button variant="default" size="lg" className="gap-2 h-12 px-6 rounded-2xl shadow-lg shadow-roseNeon/30">
-            <PlusCircle className="w-5 h-5" />
-            Create New QR Invite
-          </Button>
-        </Link>
-      </motion.div>
-
-      {/* Stats Row */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5"
-      >
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6 backdrop-blur-xl hover:border-white/20 transition-all shadow-lg">
-          <span className="text-xs text-white/50 font-bold uppercase tracking-wider block mb-1">
-            Total Invites
-          </span>
-          <div className="text-3xl sm:text-4xl font-black text-white">
-            <AnimatedCounter value={invites.length} />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/[0.06] p-5 sm:p-6 backdrop-blur-xl hover:border-emerald-500/40 transition-all shadow-lg shadow-emerald-950/20">
-          <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block mb-1">
-            Active / Claimed QRs
-          </span>
-          <div className="text-3xl sm:text-4xl font-black text-emerald-300">
-            <AnimatedCounter value={activeInvites.length} />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-roseNeon/25 bg-roseNeon/[0.06] p-5 sm:p-6 backdrop-blur-xl hover:border-roseNeon/40 transition-all shadow-lg shadow-roseNeon/10">
-          <span className="text-xs text-rose-300 font-bold uppercase tracking-wider block mb-1">
-            Completed Matches
-          </span>
-          <div className="text-3xl sm:text-4xl font-black text-roseNeon">
-            <AnimatedCounter value={completedMatches} />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-electricViolet/25 bg-electricViolet/[0.06] p-5 sm:p-6 backdrop-blur-xl hover:border-electricViolet/40 transition-all shadow-lg shadow-purple-950/20">
-          <span className="text-xs text-purple-300 font-bold uppercase tracking-wider block mb-1">
-            Vibe Connections
-          </span>
-          <div className="text-3xl sm:text-4xl font-black text-electricViolet">
-            <AnimatedCounter value={matches.length} />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* TABS: Invites I Sent VS Quizzes I Answered */}
-      <Tabs defaultValue="invites" className="w-full">
-        <TabsList className="grid grid-cols-2 max-w-md mb-8 h-12 p-1 bg-white/5 border border-white/10 rounded-2xl">
-          <TabsTrigger value="invites" className="rounded-xl text-xs sm:text-sm font-bold">
-            Invites I Sent ({invites.length})
-          </TabsTrigger>
-          <TabsTrigger value="matches" className="rounded-xl text-xs sm:text-sm font-bold">
-            Our Shared Vibe Matches ({matches.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* TAB 1: INVITES I SENT */}
-        <TabsContent value="invites" className="space-y-4">
-          {invites.length === 0 ? (
-            <div className="text-center py-16 sm:py-20 rounded-3xl border border-white/10 bg-white/[0.02] px-4 space-y-3">
-              <QrCode className="w-14 h-14 text-white/30 mx-auto mb-2" />
-              <h3 className="text-xl font-bold text-white">No QR Invites Created Yet</h3>
-              <p className="text-xs sm:text-sm text-white/50 max-w-sm mx-auto">
-                Create a 1-of-1 private QR code for your friend or crush to break the ice!
-              </p>
-              <div className="pt-2">
-                <Link href="/create">
-                  <Button variant="default" size="lg" className="rounded-2xl">
-                    Create Your First Invite
-                  </Button>
-                </Link>
+    <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full space-y-8 sm:space-y-10">
+      {/* ── Profile hero ── */}
+      <motion.div initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
+        <HoloCard accent="rose" className="relative overflow-hidden p-6 sm:p-10">
+          <MandalaRing className="absolute -right-24 -top-24 w-[380px] opacity-50 hidden sm:block" />
+          <MandalaRing className="absolute -left-24 -bottom-24 w-[380px] opacity-50 hidden sm:block" />
+          <div className="relative flex flex-col sm:flex-row items-center sm:justify-between gap-6 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <AvatarOrb src={user.avatarUrl} emoji={user.customAvatarEmoji || '😎'} alt={user.name} size="xl" />
+              <div>
+                <span className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-white/45 font-bold">Welcome back</span>
+                <h1 className="font-display text-2xl sm:text-4xl font-black text-white tracking-tight mt-1">{user.name}</h1>
+                <p className="text-xs sm:text-sm text-rose-300 font-semibold mt-1.5">{user.tagline || 'Ready to match vibes ✨'}</p>
               </div>
             </div>
+            <Link href="/create" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full gap-2 rounded-2xl">
+                <PlusCircle className="w-5 h-5" />
+                Create New QR Invite
+              </Button>
+            </Link>
+          </div>
+        </HoloCard>
+      </motion.div>
+
+      {/* ── Stats (4, symmetric) ── */}
+      <Stagger immediate className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <StaggerItem key={s.label}>
+              <HoloCard accent={s.accent} tilt className="group p-5 sm:p-6 h-full">
+                <div className="flex flex-col items-center text-center gap-2.5">
+                  <Medallion accent={s.accent} className="w-11 h-11 sm:w-12 sm:h-12">
+                    <Icon className="w-5 h-5" />
+                  </Medallion>
+                  <div className={cn('font-display text-3xl sm:text-4xl font-black', ACCENT_SOLID[s.accent])}>
+                    <AnimatedCounter value={s.value} />
+                  </div>
+                  <span className="text-[10px] sm:text-xs text-white/50 font-bold uppercase tracking-[0.16em]">{s.label}</span>
+                </div>
+              </HoloCard>
+            </StaggerItem>
+          );
+        })}
+      </Stagger>
+
+      {/* inline error toast */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-sm text-red-300"
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> {error}
+            </span>
+            <button onClick={() => setError(null)} className="p-1 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Dismiss">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Tabs ── */}
+      <Tabs defaultValue="invites" className="w-full">
+        <div className="flex justify-center mb-6 sm:mb-8">
+          <TabsList className="grid grid-cols-2 w-full max-w-md h-12">
+            <TabsTrigger value="invites" className="text-xs sm:text-sm">
+              <QrCode className="w-4 h-4" /> Invites ({invites.length})
+            </TabsTrigger>
+            <TabsTrigger value="matches" className="text-xs sm:text-sm">
+              <Heart className="w-4 h-4" /> Matches ({matches.length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* INVITES — ticket cards */}
+        <TabsContent value="invites">
+          {invites.length === 0 ? (
+            <EmptyState
+              icon={QrCode}
+              title="No QR Invites Created Yet"
+              body="Create a 1-of-1 private QR code for your friend or crush to break the ice!"
+              cta="Create Your First Invite"
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {invites.map((inv) => (
-                <motion.div
-                  key={inv.id}
-                  whileHover={{ y: -4 }}
-                  transition={{ duration: 0.25 }}
-                  className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl hover:border-white/25 transition-all flex flex-col justify-between shadow-xl"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="font-mono text-xs font-bold text-white/80 px-3 py-1 rounded-xl bg-white/5 border border-white/10">
-                        {inv.shortCode}
-                      </span>
-                      <Badge
-                        variant={
-                          inv.status === 'ACTIVE'
-                            ? 'active'
-                            : inv.status === 'CLAIMED'
-                            ? 'claimed'
-                            : inv.status === 'COMPLETED'
-                            ? 'completed'
-                            : inv.status === 'EXPIRED'
-                            ? 'expired'
-                            : 'revoked'
-                        }
-                      >
-                        {inv.status}
-                      </Badge>
-                    </div>
+            <Stagger immediate className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {invites.map((inv) => {
+                const accent = STATUS_ACCENT[inv.status] || 'violet';
+                const live = inv.status === 'ACTIVE' || inv.status === 'CLAIMED';
+                return (
+                  <StaggerItem key={inv.id} className="h-full">
+                    <HoloCard
+                      accent={accent}
+                      tilt
+                      className={cn('group h-full flex flex-col', !live && inv.status !== 'COMPLETED' && 'opacity-75')}
+                      contentClassName="flex flex-col h-full"
+                    >
+                      {/* top stub */}
+                      <div className="p-5 sm:p-6 pb-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="font-mono text-[11px] font-bold tracking-[0.2em] text-white/80 px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10">
+                            {inv.shortCode}
+                          </span>
+                          <Badge variant={STATUS_VARIANT[inv.status] || 'expired'} dot>
+                            {inv.status}
+                          </Badge>
+                        </div>
+                        <h4 className="font-display text-lg sm:text-xl font-bold text-white tracking-tight mb-1">
+                          {inv.prefilledFriendName ? `For ${inv.prefilledFriendName}` : 'Open Invite'}
+                        </h4>
+                        <p className="text-[11px] sm:text-xs text-white/45">
+                          {inv.questionCount} Questions · {new Date(inv.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
 
-                    <h4 className="text-xl font-extrabold text-white mb-1 tracking-tight">
-                      {inv.prefilledFriendName ? `For ${inv.prefilledFriendName}` : 'Open Invite'}
-                    </h4>
+                      {/* perforation with notches */}
+                      <div className="relative h-6 flex items-center">
+                        <span className="ticket-notch -left-[11px]" />
+                        <div className="perforation flex-1 mx-4" />
+                        <span className="ticket-notch -right-[11px]" />
+                      </div>
 
-                    <p className="text-xs text-white/50 mb-4">
-                      {inv.questionCount} Questions • Created on{' '}
-                      {new Date(inv.createdAt).toLocaleDateString()}
-                    </p>
-
-                    <div className="mb-4">
-                      <CountdownTimer expiresAt={inv.expiresAt} />
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-4 border-t border-white/10">
-                    {inv.status === 'COMPLETED' && inv.completedMatchId ? (
-                      <Link href={`/match/${inv.completedMatchId}`} className="w-full">
-                        <Button variant="rose" size="sm" className="w-full gap-2 h-11 rounded-xl font-bold shadow-md shadow-roseNeon/20">
-                          <Heart className="w-4 h-4 fill-white" />
-                          View Match Result
-                        </Button>
-                      </Link>
-                    ) : inv.status === 'ACTIVE' || inv.status === 'CLAIMED' ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={revokingId === inv.id}
-                        onClick={() => handleRevoke(inv.id)}
-                        className="w-full text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20 h-10 rounded-xl"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        {revokingId === inv.id ? 'Revoking...' : 'Revoke QR Now'}
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-white/40 italic">
-                        No longer active
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                      {/* bottom stub */}
+                      <div className="p-5 sm:p-6 pt-3 mt-auto space-y-4">
+                        <CountdownTimer expiresAt={inv.expiresAt} />
+                        {inv.status === 'COMPLETED' && inv.completedMatchId ? (
+                          <Link href={`/match/${inv.completedMatchId}`} className="block">
+                            <Button variant="rose" size="sm" className="w-full gap-2 h-11 rounded-xl font-bold">
+                              <Heart className="w-4 h-4 fill-white" />
+                              View Match Result
+                            </Button>
+                          </Link>
+                        ) : live ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={revokingId === inv.id}
+                            onClick={() => setPendingRevoke(inv)}
+                            className="w-full gap-1.5 text-xs text-red-300 hover:text-red-200 hover:bg-red-500/10 border-red-500/25 h-11 rounded-xl"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {revokingId === inv.id ? 'Revoking…' : 'Revoke QR'}
+                          </Button>
+                        ) : (
+                          <div className="h-11 grid place-items-center rounded-xl border border-dashed border-white/10 text-xs text-white/35 italic">
+                            No longer active
+                          </div>
+                        )}
+                      </div>
+                    </HoloCard>
+                  </StaggerItem>
+                );
+              })}
+            </Stagger>
           )}
         </TabsContent>
 
-        {/* TAB 2: OUR SHARED VIBE MATCHES */}
-        <TabsContent value="matches" className="space-y-4">
+        {/* MATCHES — dual avatar cards */}
+        <TabsContent value="matches">
           {matches.length === 0 ? (
-            <div className="text-center py-16 sm:py-20 rounded-3xl border border-white/10 bg-white/[0.02] px-4 space-y-3">
-              <Heart className="w-14 h-14 text-white/30 mx-auto mb-2" />
-              <h3 className="text-xl font-bold text-white">No Shared Matches Yet</h3>
-              <p className="text-xs sm:text-sm text-white/50 max-w-sm mx-auto">
-                When a friend answers your quiz, or when you answer a friend&apos;s quiz, your match connection and live chat will appear here!
-              </p>
-              <div className="pt-2">
-                <Link href="/create">
-                  <Button variant="default" size="lg" className="rounded-2xl">
-                    Create an Invite
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              icon={Heart}
+              title="No Shared Matches Yet"
+              body="When a friend answers your quiz, or when you answer a friend's quiz, your match and live chat will appear here!"
+              cta="Create an Invite"
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <Stagger immediate className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {matches.map((m) => (
-                <Link key={m.id} href={`/match/${m.id}`}>
-                  <motion.div
-                    whileHover={{ y: -4, scale: 1.01 }}
-                    transition={{ duration: 0.25 }}
-                    className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl hover:border-roseNeon/40 hover:bg-white/[0.05] transition-all flex flex-col justify-between group cursor-pointer shadow-xl"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        {m.partnerAvatar ? (
-                          <img
-                            src={m.partnerAvatar}
-                            alt={m.partnerName}
-                            className="w-13 h-13 rounded-2xl object-cover border border-roseNeon shadow-md"
-                          />
-                        ) : (
-                          <div className="w-13 h-13 rounded-2xl bg-roseNeon/20 border border-roseNeon/40 flex items-center justify-center text-2xl shadow-md">
-                            {m.partnerEmoji || '💖'}
+                <StaggerItem key={m.id} className="h-full">
+                  <Link href={`/match/${m.id}`} className="block h-full">
+                    <HoloCard accent="rose" tilt className="group p-5 sm:p-6 h-full cursor-pointer" contentClassName="flex flex-col h-full">
+                      <div className="flex items-center justify-between gap-4 mb-5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative flex -space-x-4 shrink-0">
+                            <AvatarOrb emoji={user.customAvatarEmoji || '😎'} src={user.avatarUrl} size="md" />
+                            <AvatarOrb emoji={m.partnerEmoji || '💖'} src={m.partnerAvatar} size="md" accent="violet" />
+                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 grid place-items-center w-5 h-5 rounded-full bg-roseNeon ring-2 ring-[#120820]">
+                              <Heart className="w-2.5 h-2.5 text-white fill-white" />
+                            </span>
                           </div>
-                        )}
-                        <div>
-                          <h4 className="text-lg font-bold text-white group-hover:text-rose-300 transition-colors">
-                            {m.partnerName}
-                          </h4>
-                          <span className="text-xs text-white/50">
-                            {m.isCreator ? 'You created quiz' : 'You answered quiz'}
-                          </span>
+                          <div className="min-w-0">
+                            <h4 className="font-display text-base sm:text-lg font-bold text-white truncate group-hover:text-rose-200 transition-colors">
+                              {m.partnerName}
+                            </h4>
+                            <span className="text-[11px] text-white/45">{m.isCreator ? 'You created quiz' : 'You answered quiz'}</span>
+                          </div>
                         </div>
+                        <MiniRing value={m.compatibilityPercent} />
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-2xl sm:text-3xl font-black text-roseNeon drop-shadow-[0_0_10px_rgba(255,51,102,0.5)]">
-                          {m.compatibilityPercent}%
+                      <div className="mt-auto flex items-center justify-between pt-4 border-t border-white/10 text-[11px] sm:text-xs text-white/55">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          {m.sameCount} / {m.totalQuestions} matched
+                        </span>
+                        <span className="text-rose-300 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                          Result &amp; Chat <ArrowRight className="w-3.5 h-3.5" />
                         </span>
                       </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs text-white/60">
-                      <span>{m.sameCount} / {m.totalQuestions} Questions Matched</span>
-                      <span className="text-rose-300 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                        View Result &amp; Chat <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                  </motion.div>
-                </Link>
+                    </HoloCard>
+                  </Link>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Revoke confirmation */}
+      <Dialog open={!!pendingRevoke} onOpenChange={(o) => !o && setPendingRevoke(null)}>
+        <DialogContent accent="rose" className="text-center">
+          <div className="flex justify-center mb-4">
+            <Medallion accent="rose" className="w-14 h-14">
+              <Trash2 className="w-6 h-6" />
+            </Medallion>
+          </div>
+          <DialogTitle>Revoke this QR invite?</DialogTitle>
+          <DialogDescription>
+            {pendingRevoke?.prefilledFriendName ? `${pendingRevoke.prefilledFriendName}'s` : 'This'} invite{' '}
+            <span className="font-mono text-white/80">{pendingRevoke?.shortCode}</span> will stop working immediately. Nobody will be able to scan it.
+          </DialogDescription>
+          <div className="grid grid-cols-2 gap-3 mt-6">
+            <Button variant="outline" onClick={() => setPendingRevoke(null)} className="h-11 rounded-xl">
+              Keep it
+            </Button>
+            <Button variant="rose" onClick={confirmRevoke} className="h-11 rounded-xl gap-1.5">
+              <Trash2 className="w-4 h-4" /> Revoke
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
